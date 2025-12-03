@@ -1,0 +1,10 @@
+requests
+beautifulsoup4
+python-dotenv
+tqdm
+chromadb
+numpy
+pydantic
+faiss-cpu
+httpx
+sentence-transformers

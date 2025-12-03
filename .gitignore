@@ -208,3 +208,7 @@ docs/source/_build/
 
 # Git
 .git/
+./run_full_demo.py
+./run_ingestion_demo.py
+
+

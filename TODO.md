@@ -26,6 +26,9 @@
 ## Completed Steps
 - [x] Created comprehensive .gitignore file for Python Django project
 - [x] Included patterns for Python, Django, vector stores, embeddings cache, environments, IDEs, OS files
+- [x] Added patterns to ignore documentation files (*.md, *.pdf) except essential ones (README.md, requirements.txt)
+- [x] Ensured test_full_application.py is not ignored (as it's a Python file, not documentation)
+- [x] Created comprehensive README.md with project overview, setup instructions, API documentation, and usage examples
 
 ## Next Steps
 - [ ] Update AIPIPE_BASE_URL to https://aipipe.org/openrouter/v1 in .env file

@@ -200,5 +200,11 @@ docs/source/_build/
 # Qodo (appears in project)
 .qodo/
 
+# Documentation files (except essential ones)
+*.md
+*.pdf
+!README.md
+!requirements.txt
+
 # Git
 .git/

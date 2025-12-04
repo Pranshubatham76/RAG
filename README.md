@@ -133,6 +133,5 @@ Key settings in `backend/settings.py`:
 - **No search results**: Ensure data is indexed in vector store
 - **LLM errors**: Verify APIPE credentials and model availability
 
-## License
 
-[Add your license here]
+

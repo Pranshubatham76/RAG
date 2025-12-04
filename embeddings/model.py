@@ -12,7 +12,18 @@ AIPIPE_API_KEY = os.getenv("AIPIPE_API_KEY")
 if not os.getenv("USE_REMOTE_EMBEDDING") and AIPIPE_BASE_URL and AIPIPE_API_KEY:
     USE_REMOTE = True
 
+# Default to local model - OpenAI model names won't work with SentenceTransformer
+# If you want to use OpenAI embeddings, set USE_REMOTE_EMBEDDING=True and configure AIPIPE
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")  # default local model
+
+# Validate model name - if it looks like an OpenAI model, warn and use default
+if EMBEDDING_MODEL.startswith("openai/") or EMBEDDING_MODEL.startswith("text-embedding"):
+    logger.warning(
+        f"EMBEDDING_MODEL '{EMBEDDING_MODEL}' looks like an OpenAI model name. "
+        f"SentenceTransformer requires HuggingFace model names. Using default 'all-MiniLM-L6-v2' instead. "
+        f"To use OpenAI embeddings, set USE_REMOTE_EMBEDDING=True and configure AIPIPE."
+    )
+    EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # Set embedding dimension based on model type
 if USE_REMOTE:

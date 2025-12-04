@@ -1,376 +1,169 @@
-# Testing Guide for Ingestion Pipeline
+# Testing Guide - Discourse RAG Application
 
-This guide explains how to test the ingestion pipeline to verify it works correctly.
+## Summary
 
-## Prerequisites
+✅ **Sample data has been successfully indexed!**
+- 8 sample Discourse posts created
+- 8 chunks generated and embedded
+- All chunks inserted into ChromaDB vector store
+- Vector store count: **8 chunks**
 
-1. **Environment Variables**: Set up your `.env` file or environment variables:
-   ```bash
-   DISCOURSE_BASE_URL=https://your-discourse-instance.com
-   DISCOURSE_API_KEY=your_api_key
-   DISCOURSE_API_USERNAME=system
-   DISCOURSE_CATEGORY=reading-club
-   VECTOR_STORE_TYPE=chroma  # or faiss
-   ```
+## What Was Done
 
-2. **Dependencies**: Ensure all required packages are installed:
-   ```bash
-   pip install -r requirements.txt
-   ```
+1. ✅ Created sample Discourse posts (8 posts covering reading club topics)
+2. ✅ Ran ingestion pipeline with sample data
+3. ✅ Fixed vector store count issue
+4. ✅ Verified data is in vector store
 
-3. **NLTK Data** (for chunker):
-   ```python
-   import nltk
-   nltk.download('punkt')
-   ```
+## How to Test the Application
 
-## Quick Test (Recommended First Step)
+### Step 1: Start Backend Server
 
-Run the automated test suite:
-
+Open a terminal and run:
 ```bash
-python -m ingestion.test_pipeline
+# Activate virtual environment (if using one)
+.\venv\Scripts\activate  # Windows
+# or
+source venv/bin/activate  # Linux/Mac
+
+# Start Django server
+python manage.py runserver
 ```
 
-This will run all component tests and verify the pipeline works end-to-end.
+The backend will be available at: `http://localhost:8000`
 
-## Component-Level Testing
+### Step 2: Start Frontend Server
 
-### 1. Test Individual Components
-
-You can test each component individually:
-
+Open a **new terminal** and run:
 ```bash
-# Test HTML parser
-python -m ingestion.test_pipeline --test html_parser
-
-# Test text cleaner
-python -m ingestion.test_pipeline --test cleaner
-
-# Test chunker
-python -m ingestion.test_pipeline --test chunker
-
-# Test embedder
-python -m ingestion.test_pipeline --test embedder
-
-# Test vector store
-python -m ingestion.test_pipeline --test vector_store
-
-# Test with mock data (no API calls)
-python -m ingestion.test_pipeline --test mock
+cd frontend
+npm start
 ```
 
-### 2. Test with Real API (Requires Credentials)
+The frontend will be available at: `http://localhost:3000`
 
+### Step 3: Test Backend Endpoints
+
+You can test the backend using the provided script:
 ```bash
-# Test Discourse fetching (small sample)
-python -m ingestion.test_pipeline --test fetch
-
-# Test full pipeline (10 posts)
-python -m ingestion.test_pipeline --test pipeline
+python test_endpoints_with_data.py
 ```
 
-## Manual Testing Steps
+Or test manually using curl:
 
-### Step 1: Test HTML Parser
-
-```python
-from ingestion.html_parser import html_to_text
-
-html = "<p>Hello <b>World</b></p><a href='https://example.com'>Link</a>"
-result = html_to_text(html)
-print(result)
-# Should output: {'text': 'Hello World\nLink', 'links': ['https://example.com'], ...}
-```
-
-### Step 2: Test Text Cleaner
-
-```python
-from ingestion.cleaner import normalize_text
-
-dirty_text = "Hello   World\n\n\nTest"
-clean = normalize_text(dirty_text)
-print(clean)
-# Should output: "Hello World\nTest"
-```
-
-### Step 3: Test Chunker
-
-```python
-from ingestion.chunker import split_into_chunks
-
-long_text = " ".join([f"Sentence {i}." for i in range(100)])
-chunks = split_into_chunks(long_text, chunk_size=50, overlap=10)
-print(f"Created {len(chunks)} chunks")
-```
-
-### Step 4: Test Embedder
-
-```python
-from embeddings.embedder import embed_chunks
-
-chunks = [
-    {"chunk_id": "1", "text": "Test chunk", "chunk_index": 0, "meta": {}}
-]
-embedded = embed_chunks(chunks)
-print(f"Embedded {len(embedded)} chunks")
-```
-
-### Step 5: Test Vector Store
-
-```python
-from vectorstore.vector_store import get_vector_store
-
-store = get_vector_store()
-stats = store.get_stats()
-print(f"Store stats: {stats}")
-```
-
-## Full Pipeline Testing
-
-### Test with Small Sample (Recommended First)
-
-```python
-from ingestion.ingest_pipeline import run_ingestion_pipeline
-
-# Test with just 10 posts
-result = run_ingestion_pipeline(min_posts=10)
-
-print(f"Status: {result['status']}")
-print(f"Posts processed: {result['posts_processed']}")
-print(f"Chunks inserted: {result['chunks_inserted']}")
-```
-
-Or via command line:
-
+**Health Check:**
 ```bash
-python -c "from ingestion.ingest_pipeline import run_ingestion_pipeline; print(run_ingestion_pipeline(min_posts=10))"
+curl http://localhost:8000/api/v1/health
 ```
 
-### Test Full Pipeline
-
-```python
-from ingestion.ingest_pipeline import run_ingestion_pipeline
-
-# Run with default settings (500 posts)
-result = run_ingestion_pipeline()
-
-if result['status'] == 'ok':
-    print("✓ Pipeline completed successfully!")
-    print(f"  Chunks inserted: {result['chunks_inserted']}")
-else:
-    print(f"✗ Pipeline failed: {result.get('error')}")
-```
-
-### Test Index Rebuild
-
-```python
-from ingestion.index_rebuilder import rebuild_index
-
-# Rebuild index (clears and re-ingests)
-result = rebuild_index(force=True, min_posts=50)
-
-print(f"Rebuild status: {result['status']}")
-```
-
-Or via command line:
-
+**Search Endpoint:**
 ```bash
-python -m ingestion.index_rebuilder --force --min-posts 50
+curl -X POST http://localhost:8000/api/v1/search \
+  -H "Content-Type: application/json" \
+  -d "{\"query\": \"What is the reading club?\", \"top_k\": 3}"
 ```
 
-## Verification Steps
-
-### 1. Check Vector Store Contents
-
-```python
-from vectorstore.vector_store import get_vector_store
-
-store = get_vector_store()
-stats = store.get_stats()
-print(f"Total chunks in store: {stats.get('count', 'unknown')}")
-
-# Test search
-test_query = [0.1] * 384  # Dummy vector (adjust dimension)
-results = store.search(test_query, top_k=5)
-print(f"Search returned {len(results)} results")
-```
-
-### 2. Verify Chunk Structure
-
-```python
-# After running pipeline, check if chunks have correct structure
-from vectorstore.vector_store import get_vector_store
-
-store = get_vector_store()
-results = store.search([0.1] * 384, top_k=1)
-
-if results:
-    chunk = results[0]
-    print(f"Chunk ID: {chunk.get('chunk_id')}")
-    print(f"Text: {chunk.get('text', '')[:100]}...")
-    print(f"Meta: {chunk.get('meta', {})}")
-    
-    # Verify required metadata fields
-    meta = chunk.get('meta', {})
-    assert 'post_id' in meta, "Missing post_id"
-    assert 'topic_id' in meta, "Missing topic_id"
-    assert 'url' in meta, "Missing url"
-```
-
-### 3. Check Logs
-
-The pipeline logs detailed information. Check logs for:
-- Number of posts fetched
-- Number of posts processed
-- Number of chunks created
-- Number of chunks inserted
-- Any errors encountered
-
-## Common Issues and Solutions
-
-### Issue: "DISCOURSE_BASE_URL not set"
-**Solution**: Set environment variables in `.env` file or export them:
+**Ask Endpoint:**
 ```bash
-export DISCOURSE_BASE_URL=https://your-instance.com
-export DISCOURSE_API_KEY=your_key
+curl -X POST http://localhost:8000/api/v1/ask \
+  -H "Content-Type: application/json" \
+  -d "{\"query\": \"What is the reading club?\", \"top_k\": 3}"
 ```
 
-### Issue: "NLTK punkt not found"
-**Solution**: Download NLTK data:
-```python
-import nltk
-nltk.download('punkt')
+### Step 4: Test Frontend
+
+1. Open your browser and go to: `http://localhost:3000`
+2. Check the health indicator - it should show "Ready (8 chunks)"
+3. Try the following queries in the "Ask Question" tab:
+   - "What is the reading club?"
+   - "What book are we reading this month?"
+   - "What are the benefits of joining?"
+   - "How do we select books?"
+   - "What are the discussion guidelines?"
+
+4. Try the "Search Chunks" tab with queries like:
+   - "reading club"
+   - "book discussion"
+   - "meeting schedule"
+
+## Expected Results
+
+### Health Endpoint
+Should return:
+```json
+{
+  "status": "healthy",
+  "ready": true,
+  "vector_store": {
+    "type": "chroma",
+    "count": 8,
+    "available": true
+  }
+}
 ```
 
-### Issue: "ChromaDB/FAISS import error"
-**Solution**: Install required packages:
-```bash
-pip install chromadb  # or
-pip install faiss-cpu
-```
+### Search Endpoint
+Should return results with:
+- `query`: Your search query
+- `count`: Number of results (up to top_k)
+- `results`: Array of chunks with:
+  - `text`: Chunk text
+  - `similarity`: Similarity score (0-1)
+  - `chunk_id`: Chunk identifier
+  - `meta`: Metadata (url, title, post_id, etc.)
 
-### Issue: "Embedding API error"
-**Solution**: 
-- Check if embedding model is available
-- Verify `EMBEDDING_MODEL` environment variable
-- Check network connection if using remote embeddings
+### Ask Endpoint
+Should return:
+- `answer`: AI-generated answer based on retrieved chunks
+- `sources`: Array of source citations
+- `latency_ms`: Processing time
+- `chunks_retrieved`: Number of chunks used
 
-### Issue: "No chunks inserted"
-**Solution**:
-- Check if posts have sufficient content (MIN_POST_LENGTH_WORDS)
-- Verify text cleaning is not removing all content
-- Check logs for filtering reasons
+## Sample Data Topics
 
-## Performance Testing
+The indexed sample data includes:
+1. Welcome to the Reading Club
+2. Monthly Book Selection (The Great Gatsby)
+3. Discussion Guidelines
+4. Benefits of Joining
+5. Book Selection Process
+6. Quarterly Meeting Schedule
+7. Tips for Book Discussions
+8. New Members Welcome
 
-### Test with Different Batch Sizes
+## Troubleshooting
 
-```python
-import os
-os.environ['INGESTION_BATCH_SIZE'] = '50'  # Smaller batches
-os.environ['EMBEDDING_BATCH_SIZE'] = '16'  # Smaller embedding batches
+### Backend won't start
+- Check if port 8000 is already in use
+- Verify Django dependencies are installed
+- Check for errors in the terminal
 
-from ingestion.ingest_pipeline import run_ingestion_pipeline
-result = run_ingestion_pipeline(min_posts=100)
-```
+### Frontend can't connect to backend
+- Ensure backend is running on port 8000
+- Check CORS settings in `backend/settings.py`
+- Verify proxy setting in `frontend/package.json` is `http://localhost:8000`
 
-### Monitor Resource Usage
+### No search results
+- Verify vector store has data: Check health endpoint
+- Ensure data was indexed: Run `python test_with_sample_data.py` again if needed
 
-```bash
-# On Linux/Mac
-python -m ingestion.ingest_pipeline &
-top -p $!
+### LLM errors in Ask endpoint
+- Check if AIPIPE credentials are configured (optional - search will still work)
+- The ask endpoint may return an error if LLM is not configured, but search should work
 
-# Or use htop
-htop
-```
+## Files Created/Modified
 
-## Integration Testing
-
-### Test End-to-End Flow
-
-1. **Clear existing index**:
-   ```python
-   from vectorstore.vector_store import get_vector_store
-   store = get_vector_store()
-   store.clear()
-   ```
-
-2. **Run ingestion**:
-   ```python
-   from ingestion.ingest_pipeline import run_ingestion_pipeline
-   result = run_ingestion_pipeline(min_posts=20)
-   ```
-
-3. **Verify search works**:
-   ```python
-   from embeddings.embedder import embed_texts
-   from vectorstore.vector_store import get_vector_store
-   
-   # Create query embedding
-   query_text = "test query"
-   query_vector = embed_texts([query_text])[0]
-   
-   # Search
-   store = get_vector_store()
-   results = store.search(query_vector, top_k=5)
-   
-   print(f"Found {len(results)} results")
-   for r in results:
-       print(f"  Score: {r['score']:.3f}, Text: {r['text'][:50]}...")
-   ```
-
-## Expected Output
-
-When running the test suite, you should see:
-
-```
-============================================================
-RUNNING ALL TESTS
-============================================================
-
-============================================================
-TEST 1: HTML Parser
-============================================================
-✓ HTML Parser test passed!
-
-============================================================
-TEST 2: Text Cleaner
-============================================================
-✓ Text Cleaner test passed!
-
-...
-
-============================================================
-TEST SUMMARY
-============================================================
-  html_parser          ✓ PASS
-  cleaner             ✓ PASS
-  chunker             ✓ PASS
-  embedder            ✓ PASS
-  vector_store        ✓ PASS
-  mock_data           ✓ PASS
-  fetch_discourse     ✓ PASS
-  full_pipeline       ✓ PASS
-
-Total: 8 passed, 0 failed, 0 skipped
-
-🎉 All tests passed!
-```
+1. `test_with_sample_data.py` - Script to index sample data
+2. `test_endpoints_with_data.py` - Script to test backend endpoints
+3. `test_connection.py` - Original connection test script
+4. `frontend/src/components/SearchTab.jsx` - Created missing component
+5. `frontend/src/components/QueryTab.jsx` - Fixed to use `chunk_text` instead of `text`
+6. `vectorstore/chroma_store.py` - Fixed `get_stats()` method
 
 ## Next Steps
 
-After verifying the pipeline works:
-
-1. **Run full ingestion** with your desired number of posts
-2. **Monitor logs** for any issues
-3. **Verify search functionality** with real queries
-4. **Check vector store stats** to confirm data is stored correctly
-
-For production deployment, consider:
-- Setting up scheduled reindexing
-- Monitoring pipeline health
-- Setting up alerts for failures
-- Optimizing batch sizes for your infrastructure
+1. Start both servers (backend and frontend)
+2. Test queries in the frontend UI
+3. Verify data flows correctly from backend to frontend
+4. Check that all fields are displayed correctly
 

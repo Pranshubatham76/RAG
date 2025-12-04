@@ -37,21 +37,37 @@ class ChromaStore:
         collection_name = collection_name or DEFAULT_COLLECTION
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
 
-        # create client with persistence (new API)
+        # create client with persistence
         try:
-            # Try new ChromaDB API (v0.4+)
-            self._client = chromadb.PersistentClient(path=persist_directory)
-            logger.debug("Using ChromaDB PersistentClient (new API)")
-        except (AttributeError, TypeError) as e:
-            # Fallback to old API if PersistentClient doesn't exist
-            logger.warning("ChromaDB new API not available, trying old API")
+            # Try ChromaDB 1.0+ API (without tenant/database for local persistence)
             try:
-                settings = ChromaSettings(chroma_db_impl=_CHROMA_DB_IMPL, persist_directory=persist_directory)
-                self._client = chromadb.Client(settings)
-                logger.debug("Using ChromaDB Client (old API)")
-            except Exception as e2:
-                logger.exception("Failed to initialize ChromaDB with both old and new API")
-                raise RuntimeError("Could not initialize ChromaDB") from e2
+                self._client = chromadb.PersistentClient(
+                    path=persist_directory,
+                    # Don't specify tenant/database for local persistence
+                )
+                logger.debug("Using ChromaDB PersistentClient (v1.0+ API)")
+            except (ValueError, AttributeError) as e:
+                # If tenant error, try without tenant validation
+                logger.warning(f"ChromaDB tenant error, trying alternative initialization: {e}")
+                # Try with explicit settings to bypass tenant validation
+                try:
+                    from chromadb.config import Settings
+                    settings = Settings(
+                        chroma_db_impl=_CHROMA_DB_IMPL,
+                        persist_directory=persist_directory,
+                        anonymized_telemetry=False
+                    )
+                    self._client = chromadb.Client(settings)
+                    logger.debug("Using ChromaDB Client (with Settings)")
+                except Exception as e3:
+                    # Last resort: try old API
+                    logger.warning("Trying old ChromaDB API")
+                    settings = ChromaSettings(chroma_db_impl=_CHROMA_DB_IMPL, persist_directory=persist_directory)
+                    self._client = chromadb.Client(settings)
+                    logger.debug("Using ChromaDB Client (old API)")
+        except Exception as e:
+            logger.exception("Failed to initialize ChromaDB")
+            raise RuntimeError(f"Could not initialize ChromaDB: {e}") from e
         # get or create collection
         try:
             self._collection = self._client.get_collection(collection_name)
@@ -204,15 +220,23 @@ class ChromaStore:
         try:
             # chroma collection may expose count through .count() or .get
             try:
-                # many chroma versions allow get to provide counts
-                info = self._collection.get(include=["ids"])
+                # Get all documents to count (with minimal data)
+                info = self._collection.get(include=["metadatas"])
                 ids_list = info.get("ids", [])
-                if ids_list and len(ids_list) > 0:
-                    stats["count"] = len(ids_list[0])
+                if ids_list:
+                    # ids can be a list or list of lists depending on chroma version
+                    if ids_list and isinstance(ids_list[0], list):
+                        stats["count"] = len(ids_list[0])
+                    else:
+                        stats["count"] = len(ids_list)
                 else:
                     stats["count"] = 0
-            except Exception:
-                stats["count"] = 0
+            except Exception as e:
+                # Fallback: try count() method if available
+                try:
+                    stats["count"] = self._collection.count()
+                except Exception:
+                    stats["count"] = 0
         except Exception:
             stats["count"] = 0
         return stats

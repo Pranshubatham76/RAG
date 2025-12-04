@@ -460,12 +460,14 @@ def test_api_endpoints():
             
             print_info("  Sending query to RAG pipeline (this may take a moment)...")
             start_time = time.time()
-            
+
             response = client.post(
-                'https://aipipe.org/openrouter/v1/ask',
+                '/api/v1/ask',
                 data=json.dumps(ask_query),
                 content_type='application/json'
             )
+
+            
             
             elapsed = (time.time() - start_time) * 1000
             
@@ -648,4 +650,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

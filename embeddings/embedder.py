@@ -200,11 +200,12 @@ def _fallback_vector(text: str, dim: int = None) -> List[float]:
     Returns:
         List of floats representing a pseudo-embedding
     """
-    # Use the configured embedding dimension, defaulting to 1536 for remote models
+    # Use the configured embedding dimension
+    # IMPORTANT: Must match the dimension used when indexing the vector store
     if dim is None:
-        # Check if we're using remote embeddings (which should be 1536)
-        from .model import USE_REMOTE
-        dim = 1536 if USE_REMOTE else EMBEDDING_DIMENSION
+        # Always use EMBEDDING_DIMENSION from config (384 for local models)
+        # The vector store was indexed with 384 dimensions, so we must match that
+        dim = EMBEDDING_DIMENSION
 
     h = abs(hash(text)) % (10**9)
 

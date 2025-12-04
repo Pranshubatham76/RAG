@@ -6,6 +6,7 @@ Flow: Parse user query → Embed query → Retrieve chunks → Build prompt → 
 """
 import logging
 import time
+import os
 from typing import Dict, Any, Optional
 
 from embeddings.embedder import embed_query
@@ -16,6 +17,19 @@ from schema.ask_request import AskRequest
 from schema.ask_response import AskResponse, Source
 
 logger = logging.getLogger(__name__)
+
+# Get min similarity from settings
+# When running in Django context, this will be overridden by settings
+# Default to 0.0 to not filter results by default
+def _get_min_similarity():
+    """Get MIN_SIMILARITY_SCORE from Django settings if available, otherwise from env."""
+    try:
+        from django.conf import settings as django_settings
+        if hasattr(django_settings, 'MIN_SIMILARITY_SCORE'):
+            return django_settings.MIN_SIMILARITY_SCORE
+    except (ImportError, RuntimeError):
+        pass
+    return float(os.getenv("MIN_SIMILARITY_SCORE", "0.0"))
 
 
 class QueryEngine:
@@ -44,7 +58,8 @@ class QueryEngine:
             prompt_builder: PromptBuilder instance (default: creates new)
             llm_client: LLMClient instance (default: creates new)
         """
-        self.retriever = retriever or Retriever()
+        min_sim = _get_min_similarity()
+        self.retriever = retriever or Retriever(min_similarity=min_sim)
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.llm_client = llm_client
         
